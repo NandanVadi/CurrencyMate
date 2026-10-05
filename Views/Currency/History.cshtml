@@ -1,0 +1,187 @@
+@model List<ConversionHistory>
+@{ ViewData["Title"] = "History"; }
+
+<div class="page-head">
+    <h1>Conversion history</h1>
+    <p>Everything you've converted, newest first. Times are shown in UTC.</p>
+</div>
+
+<style>
+    .history-filters { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; margin-bottom: 24px; }
+    .hf-search { flex: 1; min-width: 200px; height: 40px; padding: 0 12px; border-radius: 8px; }
+    .hf-select { height: 40px; width: auto; min-width: 150px; font-size: 0.95rem; border-radius: 8px; padding-left: 12px; }
+    .hf-date { height: 40px; font-size: 0.9rem; padding: 0 12px; border-radius: 8px; flex: 1; }
+    .btn-use-again { font-size: 0.85rem; display: inline-flex; align-items: center; gap: 6px; text-decoration: none; color: var(--text-secondary); transition: color 0.2s; }
+    .btn-use-again:hover { color: var(--accent-orange); }
+    @@media (max-width: 768px) {
+        .history-filters { flex-direction: column; align-items: stretch; }
+        .hf-search, .hf-select, #customDateWrap { width: 100%; }
+        #customDateWrap { flex-direction: row; }
+    }
+</style>
+
+@if (Model.Count == 0)
+{
+    <div class="panel empty">
+        <div class="empty-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
+        </div>
+        <h2 style="margin-bottom: 8px;">No conversions yet</h2>
+        <p style="color: var(--text-secondary); margin-bottom: 24px;">Your conversions will appear here so you can find them again.</p>
+        <a class="btn btn-primary" asp-controller="Currency" asp-action="Index">Convert a currency</a>
+    </div>
+}
+else
+{
+    <div class="history-filters">
+        <div class="input-group hf-search">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--text-secondary); margin-right: 8px;"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input id="historySearch" type="text" placeholder="Search currencies or amounts..." style="font-size: 0.95rem; font-family: var(--font);" aria-label="Search history" />
+        </div>
+        
+        <select id="dateFilter" class="std-input hf-select" aria-label="Filter by date">
+            <option value="all">All time</option>
+            <option value="today">Today</option>
+            <option value="7days">Last 7 days</option>
+            <option value="30days">Last 30 days</option>
+            <option value="custom">Custom range...</option>
+        </select>
+        
+        <div id="customDateWrap" style="display: none; align-items: center; gap: 8px;">
+            <input type="date" id="dateStart" class="std-input hf-date" aria-label="Start date" />
+            <span class="muted">-</span>
+            <input type="date" id="dateEnd" class="std-input hf-date" aria-label="End date" />
+        </div>
+        
+        <button id="clearFilters" class="btn btn-ghost btn-sm" style="height: 40px; display: none; padding: 0 16px; border-radius: 8px;">Clear filters</button>
+    </div>
+
+    <div class="panel" style="padding: 24px;">
+        <div style="overflow-x: auto;">
+            <table class="ledger">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Pair</th>
+                        <th class="r">Amount</th>
+                        <th class="r">Rate</th>
+                        <th class="r">Result</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody id="historyBody">
+                    @foreach (var c in Model)
+                    {
+                        var searchStr = $"{c.FromCurrency} {c.ToCurrency} {c.Amount} {c.ConvertedAmount}".ToLowerInvariant();
+                        <tr class="history-row" data-date="@c.ConvertedAt.ToString("yyyy-MM-ddTHH:mm:ss")" data-search="@searchStr">
+                            <td class="muted">@c.ConvertedAt.ToString("MMM dd yyyy, HH:mm")</td>
+                            <td>
+                                <div class="ledger-pair">
+                                    <span>@c.FromCurrency</span> <span class="muted">&rarr;</span> <span>@c.ToCurrency</span>
+                                </div>
+                            </td>
+                            <td class="r num" style="color: var(--text-secondary);">@c.Amount.ToString("N2")</td>
+                            <td class="r num muted">@c.Rate.ToString("0.######")</td>
+                            <td class="r num"><strong>@c.ConvertedAmount.ToString("N2")</strong></td>
+                            <td class="r">
+                                <a class="btn-use-again" asp-action="Index" asp-route-amount="@c.Amount" asp-route-fromCurrency="@c.FromCurrency" asp-route-toCurrency="@c.ToCurrency" title="Use again">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
+                                    Use again
+                                </a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+            <div id="noResults" class="empty" style="display: none; padding: 40px;">
+                <p class="muted">No conversions match your search.</p>
+            </div>
+        </div>
+    </div>
+}
+
+@section Scripts {
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            var search = document.getElementById('historySearch');
+            var filter = document.getElementById('dateFilter');
+            var start = document.getElementById('dateStart');
+            var end = document.getElementById('dateEnd');
+            var customWrap = document.getElementById('customDateWrap');
+            var clearBtn = document.getElementById('clearFilters');
+            var rows = document.querySelectorAll('.history-row');
+            var noResults = document.getElementById('noResults');
+
+            function filterRows() {
+                var term = search.value.toLowerCase().trim();
+                var f = filter.value;
+                var now = new Date();
+                var sDate = start.value ? new Date(start.value) : null;
+                var eDate = end.value ? new Date(end.value) : null;
+                
+                var hasActiveFilter = term.length > 0 || f !== 'all';
+                clearBtn.style.display = hasActiveFilter ? 'inline-flex' : 'none';
+                customWrap.style.display = f === 'custom' ? 'flex' : 'none';
+
+                var visibleCount = 0;
+                rows.forEach(function(row) {
+                    var matchSearch = true;
+                    if (term) {
+                        var searchData = row.getAttribute('data-search');
+                        matchSearch = searchData.indexOf(term) !== -1;
+                    }
+
+                    var matchDate = true;
+                    if (f !== 'all') {
+                        var rowDateStr = row.getAttribute('data-date');
+                        if (rowDateStr) {
+                            // Ensure UTC parse behaves nicely by appending 'Z'
+                            var rowDate = new Date(rowDateStr + 'Z');
+                            if (f === 'today') {
+                                matchDate = rowDate.toDateString() === now.toDateString();
+                            } else if (f === '7days') {
+                                var d = new Date(); d.setDate(d.getDate() - 7);
+                                matchDate = rowDate >= d;
+                            } else if (f === '30days') {
+                                var d = new Date(); d.setDate(d.getDate() - 30);
+                                matchDate = rowDate >= d;
+                            } else if (f === 'custom') {
+                                if (sDate) {
+                                    sDate.setHours(0,0,0,0);
+                                    matchDate = matchDate && rowDate >= sDate;
+                                }
+                                if (eDate) {
+                                    eDate.setHours(23,59,59,999);
+                                    matchDate = matchDate && rowDate <= eDate;
+                                }
+                            }
+                        }
+                    }
+
+                    var show = matchSearch && matchDate;
+                    row.style.display = show ? '' : 'none';
+                    if (show) visibleCount++;
+                });
+
+                if (noResults) {
+                    noResults.style.display = visibleCount === 0 && rows.length > 0 ? 'block' : 'none';
+                }
+            }
+
+            if (search) {
+                search.addEventListener('input', filterRows);
+                filter.addEventListener('change', filterRows);
+                start.addEventListener('change', filterRows);
+                end.addEventListener('change', filterRows);
+
+                clearBtn.addEventListener('click', function() {
+                    search.value = '';
+                    filter.value = 'all';
+                    start.value = '';
+                    end.value = '';
+                    filterRows();
+                });
+            }
+        });
+    </script>
+}

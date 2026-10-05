@@ -1,0 +1,47 @@
+@model LoginViewModel
+@{ ViewData["Title"] = "Log in"; }
+
+<div class="auth-box">
+    <div class="panel">
+        <h1 style="text-align: center; margin-bottom: 8px;">Welcome back</h1>
+        <p class="muted" style="text-align: center; margin-bottom: 32px;">Log in to see your history and favorites.</p>
+
+        <div asp-validation-summary="ModelOnly" class="alert error"></div>
+
+        <form asp-action="Login" method="post">
+            <input asp-for="ReturnUrl" type="hidden" />
+
+            <div class="field">
+                <label asp-for="Email" class="label"></label>
+                <input asp-for="Email" type="email" class="std-input" autocomplete="email" placeholder="you@example.com" autofocus />
+                <span asp-validation-for="Email" class="field-error"></span>
+            </div>
+
+            <div class="field">
+                <label asp-for="Password" class="label"></label>
+                <input asp-for="Password" type="password" class="std-input" autocomplete="current-password" />
+                <span asp-validation-for="Password" class="field-error"></span>
+            </div>
+
+            <label style="display: flex; align-items: center; gap: 8px; font-size: 0.9rem; cursor: pointer; color: var(--text-secondary);">
+                <input asp-for="RememberMe" type="checkbox" style="width: 16px; height: 16px; accent-color: var(--text-primary);" />
+                <span>Keep me logged in</span>
+            </label>
+
+            <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 8px;">Log in</button>
+        </form>
+
+        <p style="text-align: center; margin-top: 24px; color: var(--text-secondary); font-size: 0.95rem;">
+            New here? <a asp-action="Register" style="color: var(--text-primary); font-weight: 500;">Create an account</a>
+        </p>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        // Overwrite the current history entry to prevent retaining sensitive state
+        if (window.history && window.history.replaceState) {
+            window.history.replaceState(null, document.title, window.location.href);
+        }
+    </script>
+}
