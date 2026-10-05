@@ -1,0 +1,95 @@
+@model TravelBudgetViewModel
+@{
+    ViewData["Title"] = "Travel Budget";
+    string Fmt(decimal? v) => v is null ? "" : v.Value.ToString("N2");
+}
+
+<div class="page-head">
+    <h1>Travel budget</h1>
+    <p>See what your trip budget is worth in your destination's currency, and how far it goes each day.</p>
+</div>
+
+@if (Model.ErrorMessage is not null)
+{
+    <div class="alert error">@Model.ErrorMessage</div>
+}
+<div asp-validation-summary="ModelOnly" class="alert error"></div>
+
+<div class="panel" style="margin-bottom: 32px;">
+    <form asp-action="Travel" method="post" class="travel-form">
+        <div class="field">
+            <label class="label" for="TotalBudget">Total budget</label>
+            <input asp-for="TotalBudget" type="number" step="any" inputmode="decimal" class="std-input" placeholder="e.g. 150000" />
+            <span asp-validation-for="TotalBudget" class="field-error"></span>
+        </div>
+        <div class="field">
+            <label class="label" for="Days">Number of days</label>
+            <input asp-for="Days" type="number" min="1" inputmode="numeric" class="std-input" placeholder="e.g. 10" />
+            <span asp-validation-for="Days" class="field-error"></span>
+        </div>
+        <div class="field">
+            <label class="label" for="FromCurrency">Home currency</label>
+            <select asp-for="FromCurrency" asp-items="@(CurrencyOptions.Items)" class="std-input"></select>
+            <span asp-validation-for="FromCurrency" class="field-error"></span>
+        </div>
+        <div class="field">
+            <label class="label" for="ToCurrency">Destination</label>
+            <select asp-for="ToCurrency" asp-items="@(CurrencyOptions.Items)" class="std-input"></select>
+            <span asp-validation-for="ToCurrency" class="field-error"></span>
+        </div>
+        <div class="field">
+            <!-- Empty label so the button perfectly aligns with other controls on the same baseline -->
+            <label class="label" aria-hidden="true">&nbsp;</label>
+            <button type="submit" class="btn btn-primary" style="height: 48px; width: 100%;">Calculate</button>
+            <span class="field-error"></span>
+        </div>
+    </form>
+</div>
+
+@if (Model.HasResult)
+{
+    <div class="budget-grid">
+        <div class="b-stat">
+            <div class="b-label">Total budget</div>
+            <div class="b-val">@Fmt(Model.ConvertedTotal) <span style="font-size:1rem; color:var(--text-secondary);">@Model.ToCurrency</span></div>
+            <div class="b-label" style="font-size:0.8rem;">from @Fmt(Model.TotalBudget) @Model.FromCurrency</div>
+        </div>
+        <div class="b-stat">
+            <div class="b-label">Daily budget &middot; @Model.Days days</div>
+            <div class="b-val">@Fmt(Model.DailyBudgetConverted) <span style="font-size:1rem; color:var(--text-secondary);">@Model.ToCurrency</span></div>
+            <div class="b-label" style="font-size:0.8rem;">@Fmt(Model.DailyBudgetHome) @Model.FromCurrency per day</div>
+        </div>
+        <div class="b-stat" style="border-color: var(--accent-orange); background: linear-gradient(180deg, rgba(242,138,75,0.05), transparent);">
+            <div class="b-label" style="color: var(--accent-orange);">Safe to spend daily</div>
+            <div class="b-val">@Fmt(Model.SuggestedDailySpending) <span style="font-size:1rem; color:var(--text-secondary);">@Model.ToCurrency</span></div>
+            <div class="b-label" style="font-size:0.8rem;">Keeps @Fmt(Model.DailyBuffer) @Model.ToCurrency/day as safety buffer</div>
+        </div>
+    </div>
+
+    <div class="panel">
+        <h2 style="margin-bottom: 24px; font-size: 1rem; color: var(--text-secondary);">Suggested daily allocation <span style="font-size:0.85rem; font-weight:normal; margin-left:8px;">in @Model.ToCurrency</span></h2>
+        
+        <div style="max-width: 600px;">
+            @foreach (var (label, share) in TravelBudgetViewModel.Split)
+            {
+                <div class="progress-row">
+                    <div class="progress-top">
+                        <span>@label <span class="muted" style="margin-left:4px;">@((int)(share * 100))%</span></span>
+                        <strong class="num">@Fmt(Math.Round(Model.SuggestedDailySpending!.Value * share, 2))</strong>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: @((int)(share * 100))%;"></div>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+
+    <div class="muted small num" style="margin-top: 24px; text-align: center;">
+        Rate: 1 @Model.FromCurrency = @(Model.Rate?.ToString("0.######")) @Model.ToCurrency
+        @if (Model.RateDate is not null)
+        {
+            <text>&middot; As of @Model.RateDate.Value.ToString("MMM dd, yyyy")</text>
+        }
+    </div>
+}
