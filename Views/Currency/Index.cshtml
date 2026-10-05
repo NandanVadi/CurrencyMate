@@ -1,0 +1,339 @@
+@model ConvertViewModel
+@{
+    ViewData["Title"] = "Convert";
+    string Num(decimal? v) => v is null ? "" : v.Value.ToString("N2");
+    string Rate(decimal? v) => v is null ? "" : v.Value.ToString("0.######");
+}
+
+<div class="page-head">
+    <h1>Currency converter</h1>
+    <p>Convert at the latest available exchange rate.</p>
+</div>
+
+@if (TempData["Message"] is string msg)
+{
+    <div class="alert info">@msg</div>
+}
+@if (Model.ErrorMessage is not null)
+{
+    <div class="alert error">@Model.ErrorMessage</div>
+}
+<div asp-validation-summary="ModelOnly" class="alert error"></div>
+
+<div class="workspace">
+    <!-- Left Column: Converter -->
+    <div class="workspace-col">
+        <form id="convertForm" asp-action="Index" method="post">
+            <div class="field" style="margin-bottom: 24px;">
+                <label class="label" for="Amount">Amount</label>
+                <div class="input-group">
+                    <input asp-for="Amount" type="number" step="any" inputmode="decimal" placeholder="0.00" />
+                    <div class="divider"></div>
+                    <select asp-for="FromCurrency" asp-items="@(CurrencyOptions.Items)"></select>
+                </div>
+                <span asp-validation-for="Amount" class="field-error"></span>
+            </div>
+            
+            <div class="swap-wrapper">
+                <button type="button" class="swap" id="swapBtn" aria-label="Swap currencies" title="Swap currencies">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4 3 8l4 4M3 8h14M17 20l4-4-4-4M21 16H7" /></svg>
+                </button>
+            </div>
+
+            <div class="field" style="margin-top: 24px; margin-bottom: 32px;">
+                <label class="label" for="ToCurrency">Destination</label>
+                <div class="input-group">
+                    <input type="text" readonly placeholder="0.00" value="@(Model.ConvertedAmount != null ? Num(Model.ConvertedAmount) : "")" style="color: var(--text-secondary); pointer-events: none; user-select: none;" tabindex="-1" />
+                    <div class="divider"></div>
+                    <select asp-for="ToCurrency" asp-items="@(CurrencyOptions.Items)"></select>
+                </div>
+                <span asp-validation-for="ToCurrency" class="field-error"></span>
+            </div>
+
+            <div style="display: flex; gap: 16px;">
+                <button type="submit" class="btn btn-primary" style="flex: 1;">Convert</button>
+                <button type="submit" formaction="@Url.Action("AddFavorite")" class="btn btn-ghost" title="Save pair">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+                    Save pair
+                </button>
+            </div>
+        </form>
+
+        @if (Model.ConvertedAmount is not null)
+        {
+            <div class="result-block">
+                <div class="muted small" style="text-transform:uppercase; letter-spacing:0.05em; margin-bottom:4px;">Converted Amount</div>
+                <div class="result-val num">@Num(Model.ConvertedAmount) <span class="result-code">@Model.ToCurrency</span></div>
+                <div class="result-meta num">
+                    <span>1 @Model.FromCurrency = @Rate(Model.Rate) @Model.ToCurrency</span>
+                    @if (Model.RateDate is not null)
+                    {
+                        <span>Latest rate available @Model.RateDate.Value.ToString("MMM dd, yyyy")</span>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+
+    <!-- Right Column: Chart -->
+    <div class="workspace-col chart-col">
+        <div class="chart-head" style="margin-bottom: 4px;">
+            <span class="chart-title">
+                <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--accent-orange); box-shadow: 0 0 6px var(--accent-orange);"></span>
+                Live market trend
+            </span>
+            @if (Model.ConvertedAmount is not null)
+            {
+                <span class="muted small num" style="letter-spacing: 0.02em;">@Model.FromCurrency / @Model.ToCurrency</span>
+            }
+        </div>
+        <div class="muted small" style="margin-bottom: 24px;">Historical movement ending at the latest available rate.</div>
+        <div class="panel chart-container">
+            @if (Model.ChartPoints.Count > 0)
+            {
+                <canvas id="trendChart"></canvas>
+            }
+            else if (Model.ConvertedAmount is not null)
+            {
+                <div class="empty" style="padding: 24px;">Chart data not available.</div>
+            }
+            else
+            {
+                <div class="empty" style="padding: 24px; color: var(--text-secondary); height: 100%; display: flex; align-items: center; justify-content: center;">
+                    Convert a currency to see the 30-day trend.
+                </div>
+            }
+        </div>
+        
+        @if (Model.Favorites.Count > 0)
+        {
+            <div class="fav-actions">
+                <span class="chart-title">Favorites</span>
+            </div>
+            <div class="chips">
+                @foreach (var f in Model.Favorites)
+                {
+                    <div class="chip">
+                        <button type="button" class="js-quick" data-from="@f.FromCurrency" data-to="@f.ToCurrency">
+                            @f.FromCurrency &rarr; @f.ToCurrency
+                        </button>
+                        <form asp-action="RemoveFavorite" method="post" style="display:flex;">
+                            <input type="hidden" name="id" value="@f.Id" />
+                            <input type="hidden" name="amount" value="@Model.Amount" />
+                            <input type="hidden" name="fromCurrency" value="@Model.FromCurrency" />
+                            <input type="hidden" name="toCurrency" value="@Model.ToCurrency" />
+                            <button type="submit" class="chip-x" title="Remove">&times;</button>
+                        </form>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+</div>
+
+@if (Model.Recent.Count > 0)
+{
+    <div class="panel" style="margin-top: 32px;">
+        <h2 style="margin-bottom: 24px; font-size: 1rem; color: var(--text-secondary);">Recent conversions</h2>
+        <table class="ledger">
+            <tbody>
+                @foreach (var r in Model.Recent)
+                {
+                    <tr>
+                        <td class="muted">@r.ConvertedAt.ToString("MMM dd, HH:mm")</td>
+                        <td>
+                            <div class="ledger-pair">
+                                <span>@r.FromCurrency</span> <span class="muted">&rarr;</span> <span>@r.ToCurrency</span>
+                            </div>
+                        </td>
+                        <td class="r num" style="color: var(--text-secondary);">@r.Amount.ToString("N2")</td>
+                        <td class="r num"><strong>@r.ConvertedAmount.ToString("N2")</strong></td>
+                        <td class="r" style="width: 100px;">
+                            <a class="muted" style="font-size: 0.85rem; display: inline-flex; align-items: center; gap: 6px; text-decoration: none; transition: color 0.2s;" onmouseover="this.style.color='var(--accent-orange)'" onmouseout="this.style.color=''" asp-action="Index" asp-route-amount="@r.Amount" asp-route-fromCurrency="@r.FromCurrency" asp-route-toCurrency="@r.ToCurrency" title="Use again">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
+                                Use again
+                            </a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@section Scripts {
+    @if (Model.ChartPoints.Count > 0)
+    {
+        <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+        <script>
+            (function () {
+                const labels = @Json.Serialize(Model.ChartPoints.Select(p => p.Date.ToString("MMM dd")));
+                const values = @Json.Serialize(Model.ChartPoints.Select(p => p.Value));
+                const rates  = @Json.Serialize(Model.ChartPoints.Select(p => p.Rate));
+                const cur = '@Model.ToCurrency';
+
+                const css = getComputedStyle(document.documentElement);
+                const accent = css.getPropertyValue('--accent-orange').trim();
+                const muted = css.getPropertyValue('--text-secondary').trim();
+
+                const ctx = document.getElementById('trendChart').getContext('2d');
+                const fill = ctx.createLinearGradient(0, 0, 0, 350);
+                fill.addColorStop(0, accent + '20');
+                fill.addColorStop(1, accent + '00');
+                
+                const pointRadii = values.map((_, i) => i === values.length - 1 ? 5 : 0);
+                const pointColors = values.map((_, i) => i === values.length - 1 ? accent : 'transparent');
+
+                const lastPointPlugin = {
+                    id: 'lastPointPlugin',
+                    afterDraw(chart) {
+                        const { ctx, chartArea: { bottom, left } } = chart;
+                        const meta = chart.getDatasetMeta(0);
+                        if (!meta.data.length) return;
+                        const pt = meta.data[meta.data.length - 1];
+                        
+                        // Vertical guide line for the last point
+                        ctx.save();
+                        ctx.beginPath();
+                        ctx.moveTo(pt.x, pt.y);
+                        ctx.lineTo(pt.x, bottom);
+                        ctx.lineWidth = 1;
+                        ctx.strokeStyle = accent;
+                        ctx.setLineDash([4, 4]);
+                        ctx.globalAlpha = 0.5;
+                        ctx.stroke();
+                        ctx.restore();
+                        
+                        // Pill with latest rate
+                        const text = rates[rates.length - 1]; 
+                        ctx.save();
+                        ctx.font = '500 12px "Space Grotesk", sans-serif';
+                        const textWidth = ctx.measureText(text).width;
+                        const padX = 8, padY = 6;
+                        const rectW = textWidth + padX * 2, rectH = 12 + padY * 2;
+                        
+                        let rectX = pt.x - rectW - 12;
+                        let rectY = pt.y - rectH / 2;
+                        if (rectX < left) { rectX = pt.x + 12; } // flip if too far left
+                        
+                        ctx.fillStyle = accent;
+                        ctx.beginPath();
+                        if (ctx.roundRect) { ctx.roundRect(rectX, rectY, rectW, rectH, 12); }
+                        else { ctx.rect(rectX, rectY, rectW, rectH); }
+                        ctx.fill();
+                        
+                        ctx.fillStyle = '#1c211f';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText(text, rectX + rectW / 2, rectY + rectH / 2 + 1);
+                        ctx.restore();
+                    }
+                };
+
+                const chart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Value',
+                            data: values,
+                            borderColor: accent,
+                            backgroundColor: fill,
+                            borderWidth: 2.5,
+                            fill: true,
+                            tension: 0.4,
+                            pointRadius: pointRadii,
+                            pointBackgroundColor: pointColors,
+                            pointBorderColor: pointColors,
+                            pointHoverRadius: 5,
+                            pointHoverBackgroundColor: accent
+                        }]
+                    },
+                    plugins: [lastPointPlugin],
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: { mode: 'index', intersect: false },
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                backgroundColor: '#1D1D1F',
+                                titleColor: '#F2F1ED',
+                                bodyColor: '#A8AAA7',
+                                borderColor: 'rgba(255,255,255,0.1)',
+                                borderWidth: 1,
+                                displayColors: false,
+                                padding: 10,
+                                cornerRadius: 8,
+                                callbacks: {
+                                    label: c => c.parsed.y.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ' + cur,
+                                    afterLabel: c => 'Rate: ' + rates[c.dataIndex]
+                                }
+                            }
+                        },
+                        scales: {
+                            x: { grid: { display: false }, border: { display: false }, ticks: { color: muted, maxTicksLimit: 5, font: {family: "'Space Grotesk', sans-serif"} } },
+                            y: { grid: { color: 'rgba(242, 241, 237, 0.08)', drawBorder: false, borderDash: [4,4] }, border: { display: false }, ticks: { color: muted, maxTicksLimit: 5, font: {family: "'Space Grotesk', sans-serif"}, callback: v => v.toLocaleString() } }
+                        }
+                    }
+                });
+
+                function updateChartTheme() {
+                    const cssUpdate = getComputedStyle(document.documentElement);
+                    const newAccent = cssUpdate.getPropertyValue('--accent-orange').trim();
+                    const newMuted = cssUpdate.getPropertyValue('--text-secondary').trim();
+                    const newGrid = cssUpdate.getPropertyValue('--chart-grid').trim();
+                    const newBg = cssUpdate.getPropertyValue('--chart-tooltip-bg').trim();
+                    const newText = cssUpdate.getPropertyValue('--chart-tooltip-text').trim();
+                    const newBorder = cssUpdate.getPropertyValue('--chart-tooltip-border').trim();
+
+                    chart.data.datasets[0].borderColor = newAccent;
+                    const newFill = ctx.createLinearGradient(0, 0, 0, 350);
+                    newFill.addColorStop(0, newAccent + '20');
+                    newFill.addColorStop(1, newAccent + '00');
+                    chart.data.datasets[0].backgroundColor = newFill;
+
+                    const newPointColors = values.map((_, i) => i === values.length - 1 ? newAccent : 'transparent');
+                    chart.data.datasets[0].pointBackgroundColor = newPointColors;
+                    chart.data.datasets[0].pointBorderColor = newPointColors;
+                    chart.data.datasets[0].pointHoverBackgroundColor = newAccent;
+
+                    chart.options.scales.x.ticks.color = newMuted;
+                    chart.options.scales.y.ticks.color = newMuted;
+                    chart.options.scales.y.grid.color = newGrid;
+                    
+                    chart.options.plugins.tooltip.backgroundColor = newBg;
+                    chart.options.plugins.tooltip.titleColor = newText;
+                    chart.options.plugins.tooltip.bodyColor = newMuted;
+                    chart.options.plugins.tooltip.borderColor = newBorder;
+
+                    chart.update();
+                }
+
+                window.addEventListener('themeChanged', updateChartTheme);
+                // Run once on load just in case theme was applied early
+                updateChartTheme();
+            })();
+        </script>
+    }
+    <script>
+        (function () {
+            var form = document.getElementById('convertForm');
+            var from = document.getElementById('FromCurrency');
+            var to = document.getElementById('ToCurrency');
+            var amount = document.getElementById('Amount');
+
+            document.getElementById('swapBtn').addEventListener('click', function () {
+                var tmp = from.value; from.value = to.value; to.value = tmp;
+            });
+
+            document.querySelectorAll('.js-quick').forEach(function (b) {
+                b.addEventListener('click', function () {
+                    from.value = b.dataset.from;
+                    to.value = b.dataset.to;
+                    if (amount.value) form.requestSubmit(); else { amount.focus(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+                });
+            });
+        })();
+    </script>
+}
