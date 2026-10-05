@@ -1,0 +1,47 @@
+@model RegisterViewModel
+@{ ViewData["Title"] = "Create account"; }
+
+<div class="auth-box">
+    <div class="panel">
+        <h1 style="text-align: center; margin-bottom: 8px;">Create account</h1>
+        <p class="muted" style="text-align: center; margin-bottom: 32px;">Your history and favorites are saved to your account.</p>
+
+        <div asp-validation-summary="ModelOnly" class="alert error"></div>
+
+        <form asp-action="Register" method="post">
+            <div class="field">
+                <label asp-for="Email" class="label"></label>
+                <input asp-for="Email" type="email" class="std-input" autocomplete="email" placeholder="you@example.com" autofocus />
+                <span asp-validation-for="Email" class="field-error"></span>
+            </div>
+
+            <div class="field">
+                <label asp-for="Password" class="label"></label>
+                <input asp-for="Password" type="password" class="std-input" autocomplete="new-password" />
+                <span class="small muted">At least 8 characters.</span>
+                <span asp-validation-for="Password" class="field-error"></span>
+            </div>
+
+            <div class="field">
+                <label asp-for="ConfirmPassword" class="label"></label>
+                <input asp-for="ConfirmPassword" type="password" class="std-input" autocomplete="new-password" />
+                <span asp-validation-for="ConfirmPassword" class="field-error"></span>
+            </div>
+
+            <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 8px;">Create account</button>
+        </form>
+
+        <p style="text-align: center; margin-top: 24px; color: var(--text-secondary); font-size: 0.95rem;">
+            Already registered? <a asp-action="Login" style="color: var(--text-primary); font-weight: 500;">Log in</a>
+        </p>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        // Overwrite the current history entry to prevent retaining sensitive state
+        if (window.history && window.history.replaceState) {
+            window.history.replaceState(null, document.title, window.location.href);
+        }
+    </script>
+}
