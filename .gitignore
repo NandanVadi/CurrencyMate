@@ -1,0 +1,9 @@
+bin/
+obj/
+.vs/
+*.db
+*.sqlite
+*.db-shm
+*.db-wal
+appsettings.Development.json
+.DS_Store
